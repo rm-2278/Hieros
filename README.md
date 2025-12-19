@@ -1,5 +1,5 @@
 # Hieros
-Implemenation of the HIERarchical imagionation On Structured State Space Sequence Models (HIEROS) paper in pytorch. This repository is based on the [DreamerV3](https://github.com/danijar/dreamerv3), [DreamerV3 in pytorch](https://github.com/NM512/dreamerv3-torch) and [S5 in pytorch](https://github.com/i404788/s5-pytorch) repositories.
+Implementation of the HIERarchical imagination On Structured State Space Sequence Models (HIEROS) paper in pytorch. This repository is based on the [DreamerV3](https://github.com/danijar/dreamerv3), [DreamerV3 in pytorch](https://github.com/NM512/dreamerv3-torch) and [S5 in pytorch](https://github.com/i404788/s5-pytorch) repositories.
 
 # Installation
 
