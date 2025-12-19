@@ -17,7 +17,7 @@ The number of subactors in Hieros is **dynamic** and can grow during training. T
 From `hieros/configs.yaml`:
 ```yaml
 max_hierarchy: 3              # Maximum number of hierarchical layers (subactors)
-add_hierarchy_every: 1        # Frequency of adding new hierarchy layers
+add_hierarchy_every: 1        # Frequency of adding new hierarchy layers (in environment time steps)
 ```
 
 ### Dynamic Growth Example
@@ -89,7 +89,8 @@ def _create_subactor(self):
         new_config.encoder["cnn_keys"] = ".*"
         new_config.decoder["cnn_keys"] = ".*"
     
-    # Determine whether to use separate world model for this subactor
+    # Determine whether this subactor gets its own world model or shares Subactor-0's
+    # When hierarchical_world_models is False, higher-level subactors share the base world model
     use_world_model = (
         new_config.higher_level_wm and new_config.hierarchical_world_models
     )
@@ -102,14 +103,14 @@ def _create_subactor(self):
             {"action": embodied.Space(np.float32, self._subgoal_shape)},  # Action space is subgoal
             self._subgoal_shape,                            # Subgoal shape
             new_config,                                     # Modified configuration
-            make_replay(                                    # Helper function to create replay buffer
-                self._config,
-                self._config.traindir / f"replay-{len(self._subactors)}",
-            ),                                              # Separate replay buffer
+            make_replay(                                    # Calls make_replay() function (lines 1126-1159)
+                self._config,                               # to create a new replay buffer instance
+                self._config.traindir / f"replay-{len(self._subactors)}",  # with separate directory
+            ),
             buffer_obs=self._config.subactor_encode_intermediate,
             buffer_obs_keys=list(self._subactors[-1].encoded_obs_space().keys()),
-            use_world_model=use_world_model,
-            other_world_model=self._subactors[0]._wm if not use_world_model else None,
+            use_world_model=use_world_model,                # If True, creates own world model
+            other_world_model=self._subactors[0]._wm if not use_world_model else None,  # If False, shares Subactor-0's world model
         )
     )
 ```
