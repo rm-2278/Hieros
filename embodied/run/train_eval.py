@@ -155,7 +155,8 @@ def train_eval(agent, train_env, eval_env, train_replay, eval_replay, logger, ar
         with torch.no_grad():
             return agent.policy(*args, mode="eval")
 
-    policy_eval = lambda *args: agent.policy(*args, mode="eval")
+    # Below version doesn't use torch.no_grad, causing potential OOM. Don't know why it is here.
+    # policy_eval = lambda *args: agent.policy(*args, mode="eval")
     while step < args.steps:
         if should_eval(step):
             print("Starting evaluation at step", int(step))

@@ -94,9 +94,9 @@ defaults:
   log_keys_sum: '^$'
   log_keys_mean: '(log_entropy)'
   log_keys_max: '^$'
-  wandb_name: null
-  wandb_prefix: null
-  wandb_logging: false
+  wandb_name: 'testv2'
+  wandb_prefix: 'pyramidal'
+  wandb_logging: true
   tensorboard_logging: false
   autoregressive_evalution: false
   store_checkpoints: false
