@@ -196,14 +196,17 @@ def main(config):
     if (logdir / "latest_model.pt").exists():
         agent.load_state_dict(torch.load(logdir / "latest_model.pt"))
         agent._should_pretrain._once = False
-    if config.model_name == "dreamer":
-        agent.eval()
-    else:
+    if config.model_name != "dreamer":
         agent.set_eval()
     if config.pretrain:
         print("pretraining for", config.pretrain, "steps...")
         for _ in tqdm(range(config.pretrain)):
-            agent.train()
+            if config.model_name == "dreamer":
+                # Dreamer's train() method is for training steps, not PyTorch's train mode
+                # Pretrain functionality not implemented for Dreamer
+                pass
+            else:
+                agent.train()
     config.batch_steps = config.batch_size * config.batch_length
 
     embodied.run.train_eval(agent, train_envs, eval_envs, train_replay, None, logger, config)
