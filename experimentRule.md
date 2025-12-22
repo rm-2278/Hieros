@@ -30,3 +30,11 @@ RTX 5070 (16GB):
 - Tested up to batch_size=16, batch_length=64 in small_model_size_old config
 - Tested up to batch_size=4, batch_length=64 in default config (batch_size=8 causes OOM)
 - Tested up to batch_size=8, batch_length=32 in default config (batch_size=16 causes OOM)
+
+
+optuna:
+pip install optuna
+
+python hieros/run_pyramidal_optuna.py \
+  --configs optuna \
+  --n_trials 30

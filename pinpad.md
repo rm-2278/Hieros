@@ -11,3 +11,10 @@ python hieros/train.py --configs pinpad
 
 
 Note: evaluation takes quite a long time.
+
+
+
+hierarchy:
+```
+python hieros/train.py --configs pinpad hierarchy_decrease --task=pinpad_three --batch_size=8 --batch_length=32
+```

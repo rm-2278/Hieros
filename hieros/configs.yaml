@@ -1,7 +1,6 @@
 defaults:
 
-  # model_name: "hieros"
-  model_name: "dreamer"
+  model_name: "hieros"
   logdir: null
   traindir: null
   evaldir: null
@@ -273,12 +272,31 @@ atari100k:
   train_ratio: 1024
   imag_gradient: 'reinforce'
   time_limit: 54000
-  wandb_name: 'pinpad_three'
-  wandb_prefix: 'pyramidal'
-  wandb_logging: false
-  model_name: "dreamer"
+  # wandb_name: 'pinpad_three'
+  # wandb_prefix: 'pyramidal'
+  # wandb_logging: false
+  # model_name: "dreamer"
 
 pinpad:
+  task: 'pinpad_three'
+  steps: 4000000
+  envs:
+    amount: 1
+  action_repeat: 2
+  actor_dist: 'onehot'
+  imag_gradient: 'reinforce'
+  eval_every: 200000
+  eval_eps: 10
+  log_every: 5000
+  batch_size: 8
+  batch_length: 16
+  train_ratio: 512
+  # wandb_logging: false
+  wandb_name: 'pinpad_three'
+  wandb_prefix: 'pyramidal'
+  # model_name: "dreamer"
+
+optuna:
   task: 'pinpad_three'
   steps: 2000000
   envs:
@@ -292,10 +310,9 @@ pinpad:
   batch_size: 8
   batch_length: 16
   train_ratio: 16
-  wandb_logging: false
+  wandb_logging: true
   wandb_name: 'pinpad_three'
-  wandb_prefix: 'pyramidal'
-  model_name: "dreamer"
+  wandb_prefix: 'optuna'
 
 debug:
   debug: True
