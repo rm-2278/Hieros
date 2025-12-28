@@ -42,13 +42,18 @@ def set_seed(seed):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
     
-    # Enable PyTorch deterministic algorithms
+    # Enable PyTorch deterministic algorithms where possible
     # Note: This may impact performance but ensures reproducibility
+    # Some operations may not have deterministic implementations and will warn
     try:
-        torch.use_deterministic_algorithms(True)
-    except Exception:
-        # Fallback for older PyTorch versions
-        pass
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except TypeError:
+        # Fallback for PyTorch versions that don't support warn_only
+        try:
+            torch.use_deterministic_algorithms(True)
+        except Exception:
+            # If it fails, just continue - other settings still help
+            pass
 
 
 to_np = lambda x: x.detach().cpu().numpy()
