@@ -28,6 +28,10 @@ from torch.optim.lr_scheduler import (
 
 def set_seed(seed):
     """Set random seed for reproducibility across all libraries."""
+    import os
+    # Set Python hash seed for reproducibility
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
     random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -37,6 +41,14 @@ def set_seed(seed):
         # Make CUDA operations deterministic
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+    
+    # Enable PyTorch deterministic algorithms
+    # Note: This may impact performance but ensures reproducibility
+    try:
+        torch.use_deterministic_algorithms(True)
+    except Exception:
+        # Fallback for older PyTorch versions
+        pass
 
 
 to_np = lambda x: x.detach().cpu().numpy()
