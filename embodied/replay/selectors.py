@@ -104,9 +104,11 @@ class TimeBalancedNaive:
     def __delitem__(self, key):
         index = self.indices.pop(key)
         last = self.keys.pop()
+        last_count = self.key_counts.pop()
         if index != len(self.keys):
             self.keys[index] = last
             self.indices[last] = index
+            self.key_counts[index] = last_count
 
 
 class EfficientTimeBalanced:
@@ -141,9 +143,11 @@ class EfficientTimeBalanced:
     def __delitem__(self, key):
         index = self.indices.pop(key)
         last = self.keys.pop()
+        last_count = self.key_counts.pop()
         if index != len(self.keys):
             self.keys[index] = last
             self.indices[last] = index
+            self.key_counts[index] = last_count
 
     def cdf(self, x):
         # this function is only defined for 2 >= x < n + 2
