@@ -120,6 +120,7 @@ defaults:
     dmc: {size: [64, 64], repeat: 2, camera: -1}
     loconav: {size: [64, 64], repeat: 2, camera: -1}
     pinpad: {}
+    pinpad-easy: {}
 
   # Model
   dynamics_model: "s5"
@@ -296,6 +297,24 @@ pinpad:
   wandb_prefix: 'pyramidal'
   # model_name: "dreamer"
 
+pinpad-easy:
+  steps: 400000
+  envs:
+    amount: 8
+  action_repeat: 2
+  actor_dist: 'onehot'
+  imag_gradient: 'reinforce'
+  eval_every: 50000
+  eval_eps: 10
+  log_every: 5000
+  batch_size: 8
+  batch_length: 16
+  train_ratio: 8
+  # wandb_logging: false
+  wandb_name: 'pinpad-easy'
+  encoder: {mlp_keys: '$^', cnn_keys: 'image'}
+  decoder: {mlp_keys: '$^', cnn_keys: 'image'}
+
 optuna:
   task: 'pinpad_three'
   steps: 2000000
@@ -307,9 +326,8 @@ optuna:
   eval_every: 200000
   eval_eps: 10
   log_every: 5000
-  batch_size: 8
-  batch_length: 16
-  train_ratio: 16
+  batch_size: 16
+  batch_length: 32
   wandb_logging: true
   wandb_name: 'pinpad_three'
   wandb_prefix: 'optuna'
@@ -326,8 +344,29 @@ debug:
   max_hierarchy: 3
   batch_size: 7
   batch_length: 9
-  train_ratio: 32
   time_limit: 100
+
+seed:
+  task: 'pinpad_three'
+  steps: 100
+  envs:
+    amount: 8
+  eval_eps: 5
+  eval_every: 200
+  log_every: 5
+
+  add_hierarchy_every: 1
+  max_hierarchy: 3
+
+  action_repeat: 2
+  actor_dist: 'onehot'
+  imag_gradient: 'reinforce'
+  batch_size: 8
+  batch_length: 16
+  train_ratio: 8
+  # wandb_logging: false
+
+
 
 
 hierarchy_decrease:
@@ -364,6 +403,20 @@ small_model_size:
     num_blocks: 4
   subgoal_compression:
     layers: 3
+
+rm_model_size:
+  dyn_hidden: 128
+  dyn_deter: 128
+  dyn_stoch: 16
+  dyn_discrete: 16
+  units: 128
+  s5:
+    model_dim: 128
+    state_dim: 64
+    num_blocks: 2
+  subgoal_compression:
+    layers: 2
+  
 
 
 medium_smol_model_size:

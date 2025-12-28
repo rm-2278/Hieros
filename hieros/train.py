@@ -261,6 +261,7 @@ def make_env(config, **overrides):
         "minecraft": "embodied.envs.minecraft:Minecraft",
         "loconav": "embodied.envs.loconav:LocoNav",
         "pinpad": "embodied.envs.pinpad:PinPad",
+        "pinpad-easy": "embodied.envs.pinpad-easy:PinPadEasy",
         "bsuite": "embodied.envs.bsuite:BSuite",
     }[suite]
     if isinstance(ctor, str):
@@ -374,4 +375,9 @@ if __name__ == "__main__":
         arg_type = tools.args_type(value)
         parser.add_argument(f"--{key}", type=arg_type, default=arg_type(value))
     args = parser.parse_args(remaining)
+
+    # Ensure that subactor_train_every matches subactor_update_every for now
+    args.subactor_train_every = args.subactor_update_every
+
+
     main(args)
