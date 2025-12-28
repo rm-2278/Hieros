@@ -304,7 +304,7 @@ pinpad-easy:
   action_repeat: 2
   actor_dist: 'onehot'
   imag_gradient: 'reinforce'
-  eval_every: 50000
+  eval_every: 100000
   eval_eps: 10
   log_every: 5000
   batch_size: 8
@@ -348,11 +348,11 @@ debug:
 
 seed:
   task: 'pinpad_three'
-  steps: 100
+  steps: 10000
   envs:
     amount: 8
   eval_eps: 5
-  eval_every: 200
+  eval_every: 200000
   log_every: 5
 
   add_hierarchy_every: 1

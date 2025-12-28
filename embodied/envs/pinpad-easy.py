@@ -16,7 +16,7 @@ class PinPadEasy(embodied.Env):
         "8": (0, 128, 128),
     }
 
-    def __init__(self, task, length=10000):
+    def __init__(self, task, length=1000):
         assert length > 0
         layout = {
             "three": LAYOUT_THREE,
