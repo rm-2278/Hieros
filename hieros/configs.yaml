@@ -344,7 +344,7 @@ pinpad-easy-director:
   encoder: {mlp_keys: '$^', cnn_keys: 'image'}
   decoder: {mlp_keys: '$^', cnn_keys: 'image'}
   subgoal_debug_visualization: True
-  debug: True
+  # debug: True
 
 optuna:
   task: 'pinpad_three'
