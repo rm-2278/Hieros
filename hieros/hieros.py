@@ -627,6 +627,7 @@ class Hieros(nn.Module):
             if not self._action_cache[frame]:
                 continue
             subgoals = []
+            subactors_list = []
             for action_subgoal, subactor in zip(
                 self._action_cache[frame],
                 reversed(self._subactors[:-1]),
@@ -634,6 +635,7 @@ class Hieros(nn.Module):
                 # Decode the fixed subgoal (action) without adding stochastic state
                 decoded = subactor.decode_subgoal(action_subgoal.squeeze(0), isfirst=False).unsqueeze(0)
                 subgoals.append(decoded)
+                subactors_list.append(subactor)
             
             # Visualize only the fixed deterministic representation
             subgoals_vis = [
@@ -647,7 +649,7 @@ class Hieros(nn.Module):
                         else self._det_cache[frame][i],
                     }
                 )
-                for i, subgoal in enumerate(subgoals)
+                for i, (subgoal, subactor) in enumerate(zip(subgoals, subactors_list))
             ]
             subgoals_vis = [
                 subgoal[
