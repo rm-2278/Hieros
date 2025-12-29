@@ -1415,60 +1415,39 @@ class SubActor(nn.Module):
                     f"Unexpected subgoal shape {subgoal.shape} with 3D state_representation {state_representation.shape}"
                 )
         else:
-            # state_representation is [B, F'] - flatten subgoal to match if needed
+            # state_representation is [B, F'] - ensure subgoal is also 2D
             if len(subgoal.shape) == 3:
                 # Flatten subgoal: [B, T, F] -> [B*T, F]
                 reshaped_subgoal = subgoal.reshape(
                     [subgoal.shape[0] * subgoal.shape[1]] + list(subgoal.shape[2:])
                 )
-                # Also flatten state_representation
-                state_representation = state_representation.unsqueeze(1)  # [B, F] -> [B, 1, F]
-                # Now both are 3D, convert both to 2D
-                state_representation = state_representation.reshape(
-                    [state_representation.shape[0] * state_representation.shape[1]] + list(state_representation.shape[2:])
-                )
             else:
                 # Both are already 2D [B, F]
                 reshaped_subgoal = subgoal
         
-        # Broadcast/expand subgoal features to match state_representation if needed
+        # Handle feature dimension mismatch by padding with zeros
         if reshaped_subgoal.shape[-1] != state_representation.shape[-1]:
-            # Features don't match - use broadcasting/padding
-            # This handles cases where subgoal features < state features
             if reshaped_subgoal.shape[-1] < state_representation.shape[-1]:
                 # Pad with zeros to match feature dimension
                 padding_size = state_representation.shape[-1] - reshaped_subgoal.shape[-1]
-                if len(reshaped_subgoal.shape) == 3:
-                    padding = torch.zeros(
-                        reshaped_subgoal.shape[0], 
-                        reshaped_subgoal.shape[1],
-                        padding_size,
-                        device=reshaped_subgoal.device
-                    )
-                else:
-                    padding = torch.zeros(
-                        reshaped_subgoal.shape[0],
-                        padding_size,
-                        device=reshaped_subgoal.device
-                    )
+                padding_shape = list(reshaped_subgoal.shape)
+                padding_shape[-1] = padding_size
+                padding = torch.zeros(padding_shape, device=reshaped_subgoal.device)
                 reshaped_subgoal = torch.cat([reshaped_subgoal, padding], dim=-1)
             else:
                 # Truncate to match
                 reshaped_subgoal = reshaped_subgoal[..., :state_representation.shape[-1]]
         
-        # Compute dims_to_sum based on tensor dimensions
-        # For 3D [B, T, F]: sum over dimension 2 (features)
-        # For 2D [B, F]: sum over dimension 1 (features)
-        dims_to_sum = list(range(len(state_representation.shape)))[2:]
-        if not dims_to_sum:
-            # For 2D tensors, sum over the last dimension (features)
-            dims_to_sum = [1]
+        # Compute cosine similarity along feature dimensions
+        # For 3D [B, T, F]: sum over features (dim 2)
+        # For 2D [B, F]: sum over features (dim 1)
+        dims_to_sum = [-1]  # Last dimension is always features
             
         gnorm = torch.norm(reshaped_subgoal, dim=dims_to_sum) + 1e-12
         fnorm = torch.norm(state_representation, dim=dims_to_sum) + 1e-12
         norm = torch.max(gnorm, fnorm)
         cos = torch.sum(reshaped_subgoal * state_representation, dim=dims_to_sum) / (
-            norm * norm
+            norm * norm  # Original algorithm uses max norm squared
         )
         subgoal_reward = torch.clamp(cos.unsqueeze(-1), min=0)
 
