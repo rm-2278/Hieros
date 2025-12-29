@@ -109,7 +109,7 @@ If you have existing configs with `action_repeat > 1` for hierarchical training:
 
 ## Related Issues
 
-- Issue: "Action-repeat not being used?" - This document explains the design
+- GitHub Issue: "Action-repeat not being used?" - This document explains that action_repeat IS being used (for step accounting), but the design was confusing
 - Inspiration: [Director](https://github.com/danijar/director) uses per-environment repeat, no global parameter
 
 ## References
