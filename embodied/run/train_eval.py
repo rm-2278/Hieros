@@ -131,21 +131,41 @@ def train_eval(agent, train_env, eval_env, train_replay, eval_replay, logger, ar
                 logger.add(eval_replay.stats, prefix="eval_replay")
             logger.add(timer.stats(), prefix="timer")
             
-            # Log position visit heatmap for pinpad environments
+            # # Log position visit heatmap for pinpad environments
+            # if hasattr(train_env, '_envs') and len(train_env._envs) > 0:
+            #     env0 = train_env._envs[0]
+            #     # Unwrap if it's a parallel environment wrapper
+            #     while hasattr(env0, 'env') and not hasattr(env0, 'get_position_heatmap'):
+            #         env0 = env0.env
+            #     if hasattr(env0, 'get_position_heatmap'):
+            #         heatmap = env0.get_position_heatmap()
+            #         logger.add({"position_heatmap": heatmap}, prefix="exploration")
+            #         # Also log position statistics
+            #         if hasattr(env0, 'get_position_stats'):
+            #             stats = env0.get_position_stats()
+            #             logger.add(stats, prefix="exploration")
+
             if hasattr(train_env, '_envs') and len(train_env._envs) > 0:
                 env0 = train_env._envs[0]
-                # Unwrap if it's a parallel environment wrapper
-                while hasattr(env0, '_env') and not hasattr(env0, 'get_position_heatmap'):
-                    env0 = env0._env
+                while not hasattr(env0, 'get_position_heatmap'):
+                    if hasattr(env0, 'env'):
+                        env0 = env0.env
+                    elif hasattr(env0, '_env'):
+                        env0 = env0._env
+                    else:
+                        break
+
                 if hasattr(env0, 'get_position_heatmap'):
-                    heatmap = env0.get_position_heatmap()
+                    heatmap_proxy = env0.get_position_heatmap()
+                    heatmap = heatmap_proxy.result() if hasattr(heatmap_proxy, 'result') else heatmap_proxy
                     logger.add({"position_heatmap": heatmap}, prefix="exploration")
-                    # Also log position statistics
-                    if hasattr(env0, 'get_position_stats'):
-                        stats = env0.get_position_stats()
+
+                if hasattr(env0, 'get_position_stats'):
+                    stats_proxy = env0.get_position_stats()
+                    stats = stats_proxy.result() if hasattr(stats_proxy, 'result') else stats_proxy
+                    if isinstance(stats, dict):
                         logger.add(stats, prefix="exploration")
-            
-            logger.write(fps=True)
+                        logger.write(fps=True)
 
     driver_train.on_step(train_step)
 
