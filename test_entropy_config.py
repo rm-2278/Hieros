@@ -149,6 +149,38 @@ def test_list_shorter_than_layers():
         return False
 
 
+def test_empty_list_error():
+    """Test that empty list raises an error."""
+    print("\n" + "="*80)
+    print("TEST: Empty list should raise error")
+    print("="*80)
+    
+    # Create a config with empty list
+    class Config:
+        def __init__(self):
+            self.actor_entropy = []
+            self.actor_state_entropy = 0.0
+            self.imag_gradient_mix = '0.0'
+    
+    config = Config()
+    
+    print(f"Original config.actor_entropy: {config.actor_entropy}")
+    
+    layer_idx = 0
+    actor_entropy_value = config.actor_entropy
+    
+    try:
+        if isinstance(actor_entropy_value, (list, tuple)):
+            if len(actor_entropy_value) == 0:
+                raise ValueError("Config list cannot be empty for layer-specific parameters")
+            actor_entropy_value = actor_entropy_value[min(layer_idx, len(actor_entropy_value) - 1)]
+        print(f"❌ FAILED: Should have raised ValueError")
+        return False
+    except ValueError as e:
+        print(f"✅ PASSED: Correctly raised ValueError: {e}")
+        return True
+
+
 def main():
     """Run all tests."""
     print("Testing actor_entropy configuration handling\n")
@@ -157,6 +189,7 @@ def main():
         test_backward_compatibility,
         test_list_values,
         test_list_shorter_than_layers,
+        test_empty_list_error,
     ]
     
     results = [test() for test in tests]

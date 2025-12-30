@@ -1015,6 +1015,8 @@ class SubActor(nn.Module):
         def get_layer_value(value, layer_idx):
             """Get layer-specific value, supporting both single values and lists."""
             if isinstance(value, (list, tuple)):
+                if len(value) == 0:
+                    raise ValueError("Config list cannot be empty for layer-specific parameters")
                 # Use layer-specific value if list, or last value if list is shorter
                 return value[min(layer_idx, len(value) - 1)]
             return value
