@@ -23,14 +23,16 @@ CONVERSION = {
 
 def convert(value):
     # Handle Future objects from worker.py by calling them to get the actual value
-    if hasattr(value, '__call__') and hasattr(value, '_receive'):
+    # Check for both __call__ and _receive attributes, and that _receive is not a method
+    # (to distinguish from Client._receive which is a method)
+    if hasattr(value, '__call__') and hasattr(value, '_receive') and hasattr(value, '_callid'):
         value = value()
     
     # Handle lists that may contain Future objects
     if isinstance(value, list) and len(value) > 0:
         # Check if any element is a Future object and resolve them
-        if any(hasattr(x, '__call__') and hasattr(x, '_receive') for x in value):
-            value = [x() if (hasattr(x, '__call__') and hasattr(x, '_receive')) else x for x in value]
+        if any(hasattr(x, '__call__') and hasattr(x, '_receive') and hasattr(x, '_callid') for x in value):
+            value = [x() if (hasattr(x, '__call__') and hasattr(x, '_receive') and hasattr(x, '_callid')) else x for x in value]
     
     # if (
     #     isinstance(value, list)
