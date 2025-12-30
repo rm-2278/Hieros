@@ -21,18 +21,33 @@ CONVERSION = {
 }
 
 
+def _is_future(value):
+    """Check if a value is a Future object from worker.py."""
+    return (
+        hasattr(value, '__call__') and 
+        hasattr(value, '_receive') and 
+        hasattr(value, '_callid')
+    )
+
+
 def convert(value):
     # Handle Future objects from worker.py by calling them to get the actual value
-    # Check for both __call__ and _receive attributes, and that _receive is not a method
-    # (to distinguish from Client._receive which is a method)
-    if hasattr(value, '__call__') and hasattr(value, '_receive') and hasattr(value, '_callid'):
+    if _is_future(value):
         value = value()
     
     # Handle lists that may contain Future objects
     if isinstance(value, list) and len(value) > 0:
-        # Check if any element is a Future object and resolve them
-        if any(hasattr(x, '__call__') and hasattr(x, '_receive') and hasattr(x, '_callid') for x in value):
-            value = [x() if (hasattr(x, '__call__') and hasattr(x, '_receive') and hasattr(x, '_callid')) else x for x in value]
+        # Check and resolve Future objects in one pass to avoid redundant checks
+        has_futures = False
+        resolved = []
+        for x in value:
+            if _is_future(x):
+                has_futures = True
+                resolved.append(x())
+            else:
+                resolved.append(x)
+        if has_futures:
+            value = resolved
     
     # if (
     #     isinstance(value, list)
