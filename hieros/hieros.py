@@ -727,10 +727,10 @@ class Hieros(nn.Module):
                 ):
                     report["subgoal_debug_visualization"] = self._visualize_subgoals_debug()
                     # Also add subgoal reward visualization
-                    if len(self._subgoal_reward_cache[self._subgoal_cache_idx]) > 0:
-                        reward_plot = self._visualize_subgoal_rewards()
-                        if reward_plot is not None:
-                            report["subgoal_rewards"] = reward_plot
+                    # if len(self._subgoal_reward_cache[self._subgoal_cache_idx]) > 0:
+                    #     reward_plot = self._visualize_subgoal_rewards()
+                    #     if reward_plot is not None:
+                    #         report["subgoal_rewards"] = reward_plot
             report["video_generation_time"] = timer.elapsed_time
         report.update(self._metrics)
         report["num_subactors"] = len(self._subactors)
@@ -942,8 +942,7 @@ class Hieros(nn.Module):
         
         # Convert plot to numpy array for wandb logging
         fig.canvas.draw()
-        plot_array = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        plot_array = plot_array.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        plot_array = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
         plt.close(fig)
         
         return plot_array
