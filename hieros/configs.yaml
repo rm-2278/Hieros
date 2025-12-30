@@ -348,7 +348,7 @@ pinpad-easy-director:
 pinpad-easy-entropy:
   steps: 1200000
   envs:
-    amount: 1
+    amount: 8
   action_repeat: 1
   actor_dist: 'onehot'
   imag_gradient: 'reinforce'
