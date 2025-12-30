@@ -57,12 +57,16 @@ def test_entropy_handling():
     with open("hieros/hieros.py", "r") as f:
         content = f.read()
     
-    # Check for the entropy handling logic
-    if "isinstance(actor_entropy_value, (list, tuple))" in content:
+    # Check for the helper function
+    if "def get_layer_value(value, layer_idx):" in content:
+        print("✅ PASSED: Found get_layer_value helper function")
+        return True
+    # Fallback to old pattern for backward compatibility
+    elif "isinstance(actor_entropy_value, (list, tuple))" in content:
         print("✅ PASSED: Found list/tuple handling for actor_entropy")
         return True
     else:
-        print("❌ FAILED: List/tuple handling for actor_entropy not found")
+        print("❌ FAILED: Neither helper function nor list/tuple handling found")
         return False
 
 
