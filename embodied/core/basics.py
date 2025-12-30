@@ -22,6 +22,16 @@ CONVERSION = {
 
 
 def convert(value):
+    # Handle Future objects from worker.py by calling them to get the actual value
+    if hasattr(value, '__call__') and hasattr(value, '_receive'):
+        value = value()
+    
+    # Handle lists that may contain Future objects
+    if isinstance(value, list) and len(value) > 0:
+        # Check if any element is a Future object and resolve them
+        if any(hasattr(x, '__call__') and hasattr(x, '_receive') for x in value):
+            value = [x() if (hasattr(x, '__call__') and hasattr(x, '_receive')) else x for x in value]
+    
     # if (
     #     isinstance(value, list)
     #     and all(isinstance(x, torch.Tensor) for x in value)
