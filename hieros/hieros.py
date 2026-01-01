@@ -1264,7 +1264,12 @@ class SubActor(nn.Module):
             
             # Reset episodic intrinsic motivation for environments that are done
             if self._use_intrinsic_motivation and self._intrinsic_motivation is not None:
-                reset_indices = torch.where(reset)[0].tolist()
+                # Convert reset to tensor if it's a numpy array
+                if isinstance(reset, np.ndarray):
+                    reset_tensor = torch.from_numpy(reset)
+                else:
+                    reset_tensor = reset
+                reset_indices = torch.where(reset_tensor)[0].tolist()
                 if len(reset_indices) > 0:
                     self._intrinsic_motivation.reset_episode(reset_indices)
 
