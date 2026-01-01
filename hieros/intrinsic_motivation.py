@@ -127,13 +127,18 @@ class RNDModule(nn.Module):
     
     def _normalize_obs(self, obs):
         """Normalize observations using running statistics."""
-        self.obs_rms.update(obs.reshape(-1, obs.shape[-1]))
-        return (obs - self.obs_rms.mean) / torch.sqrt(self.obs_rms.var + 1e-8)
+        # CRITICAL: Detach to prevent infinite computation graph
+        self.obs_rms.update(obs.reshape(-1, obs.shape[-1]).detach())
+        # Use detached statistics to prevent backprop through running mean
+        mu = self.obs_rms.mean.detach()
+        sigma = torch.sqrt(self.obs_rms.var + 1e-8).detach()
+        return (obs - mu) / sigma
     
     def _normalize_reward(self, reward):
         """Normalize rewards using running statistics."""
-        self.reward_rms.update(reward.reshape(-1, 1))
-        return reward / torch.sqrt(self.reward_rms.var + 1e-8)
+        # CRITICAL: Detach to prevent infinite computation graph
+        self.reward_rms.update(reward.reshape(-1, 1).detach())
+        return reward / torch.sqrt(self.reward_rms.var.detach() + 1e-8)
     
     def train_step(self, features):
         """
@@ -211,6 +216,14 @@ class EpisodicCountModule(nn.Module):
             torch.randn(input_dim, num_bins, device=config.device) / np.sqrt(input_dim)
         )
         
+        # OPTIMIZATION: Pre-compute powers of two for vectorized bit-packing
+        # Limit to 63 bits to fit in signed int64
+        safe_bins = min(num_bins, 63)
+        self.register_buffer(
+            'powers_of_two',
+            (2 ** torch.arange(safe_bins, device=config.device)).long()
+        )
+        
         # Episodic memory - stores latent states from current episode
         # Will be reset at episode boundaries
         self._episodic_memory = defaultdict(list)
@@ -258,49 +271,68 @@ class EpisodicCountModule(nn.Module):
             batch = features.shape[0]
             seq = 1
         
-        # Normalize features
-        self.feature_rms.update(features_flat)
-        normalized = (features_flat - self.feature_rms.mean) / torch.sqrt(self.feature_rms.var + 1e-8)
+        # --- FIX 1: MEMORY LEAK PREVENTION ---
+        # CRITICAL: Detach features before updating statistics to prevent infinite graph
+        self.feature_rms.update(features_flat.detach())
         
-        # Compute hash keys using random projection (stay on GPU as much as possible)
+        # Use detached stats to ensure we don't backprop through running mean
+        mu = self.feature_rms.mean.detach()
+        sigma = torch.sqrt(self.feature_rms.var + 1e-8).detach()
+        normalized = (features_flat - mu) / sigma
+        
+        # --- FIX 2: VECTORIZED HASHING (Optimized) ---
+        # Project to lower dimension
         projected = torch.matmul(normalized, self.random_projection)
-        hash_keys = (projected > 0).long()  # Binary hash as long tensor
         
-        # Convert hash to a single integer key per sample using bit packing
-        # For num_bins <= 64, we can pack into a single int64
-        num_bins = hash_keys.shape[-1]
-        if num_bins <= 64:
-            # Pack binary hash into single integer (stays on GPU)
-            powers = (2 ** torch.arange(num_bins, device=hash_keys.device)).long()
-            hash_ints = (hash_keys * powers).sum(dim=-1).cpu().numpy()  # Single CPU transfer
+        # Create binary hash codes (0 or 1)
+        hash_bits = (projected > 0).long()
+        
+        # Bit-packing: Turn [Batch, num_bins] bits into [Batch] integers
+        # This operation is fully vectorized on GPU
+        num_bins = hash_bits.shape[-1]
+        if num_bins <= 63:
+            hash_ints = (hash_bits * self.powers_of_two).sum(dim=-1)
         else:
-            # Fallback for larger bins - chunk into multiple ints
-            hash_ints = hash_keys.cpu().numpy()
+            # Fallback for large bins (use first 63 bits)
+            hash_ints = (hash_bits[..., :63] * self.powers_of_two).sum(dim=-1)
         
-        # Compute intrinsic rewards using counts
-        intrinsic_rewards = torch.zeros(features_flat.shape[0], dtype=features.dtype, device=features.device)
+        # Single CPU transfer for hash keys
+        hash_ints_cpu = hash_ints.cpu().numpy()
         
-        for i in range(features_flat.shape[0]):
-            env_idx = int(env_indices[i % batch]) if env_indices is not None else i % batch
-            if num_bins <= 64:
-                hash_key = int(hash_ints[i])
+        # Pre-calculate rewards on CPU then move back once
+        rewards_cpu = np.zeros(features_flat.shape[0], dtype=np.float32)
+        
+        # Pre-calculate environment indices
+        if env_indices is None:
+            env_indices_cpu = np.arange(features_flat.shape[0]) % batch
+        else:
+            # Handle tensor env_indices
+            if hasattr(env_indices, 'cpu'):
+                env_indices_np = env_indices.cpu().numpy()
             else:
-                hash_key = tuple(hash_ints[i].tolist())
+                env_indices_np = np.array(env_indices)
+            env_indices_cpu = np.tile(env_indices_np, seq) if has_seq else env_indices_np
+        
+        # Counting loop (Pure CPU - fast)
+        for i in range(features_flat.shape[0]):
+            env_idx = int(env_indices_cpu[i % len(env_indices_cpu)])
+            key = int(hash_ints_cpu[i])
             
             # Enforce memory limit per environment
             if len(self._visit_counts[env_idx]) >= self._max_hash_entries_per_env:
-                # Remove oldest entries (FIFO-like behavior)
                 keys_to_remove = list(self._visit_counts[env_idx].keys())[:len(self._visit_counts[env_idx]) // 4]
                 for k in keys_to_remove:
                     del self._visit_counts[env_idx][k]
             
             # Increment count
-            self._visit_counts[env_idx][hash_key] += 1
-            count = self._visit_counts[env_idx][hash_key]
+            self._visit_counts[env_idx][key] += 1
+            count = self._visit_counts[env_idx][key]
             
-            # Intrinsic reward: inverse sqrt of count
-            intrinsic_rewards[i] = 1.0 / np.sqrt(count)
+            # Inverse sqrt reward
+            rewards_cpu[i] = 1.0 / np.sqrt(count)
         
+        # Move rewards back to GPU (single transfer)
+        intrinsic_rewards = torch.from_numpy(rewards_cpu).to(features.device, dtype=features.dtype)
         intrinsic_rewards = intrinsic_rewards.unsqueeze(-1)
         
         if has_seq:
