@@ -17,15 +17,18 @@ class PinPadEasy(embodied.Env):
     }
 
     # Reward modes for experimentation
+    # All modes (except sparse and dense_guidance) use longest suffix match pattern:
+    # - Score = length of longest buffer suffix that matches target prefix
+    # - Positive reward when score increases, negative when it decreases
     REWARD_MODES = {
-        "flat": "Flat +1.0 for each correct intermediate tile (original)",
-        "progressive": "Exponentially increasing rewards for later tiles",
-        "sequence_bonus": "Base reward + bonus based on sequence length",
-        "decaying": "Time-decaying intermediate rewards",
+        "flat": "Flat +1.0 per score increase (suffix match pattern)",
+        "progressive": "Exponential (2^pos) per score increase (suffix match pattern)",
+        "sequence_bonus": "Base + bonus per score increase (suffix match pattern)",
+        "decaying": "Time-decaying rewards per score increase (suffix match pattern)",
         "sparse": "Only reward for completing full sequence",
-        "progressive_steep": "Steeper exponential increase for later tiles",
+        "progressive_steep": "Steep exponential (3^pos) per score increase (suffix match pattern)",
         "dense_guidance": "Step-wise rewards: +0.1 for moving toward target, -0.1 for wrong tile",
-        "progress_any": "Reward based on longest suffix match to target sequence",
+        "progress_any": "Flat +1.0 per score increase (suffix match pattern)",
     }
 
     # Dense guidance reward constants (can be tuned)
@@ -140,13 +143,26 @@ class PinPadEasy(embodied.Env):
                 self.sequence.append(tile)
                 
                 # Handle different reward modes for tile visits
-                if self.reward_mode == "progress_any":
-                    # Compute reward based on change in longest suffix match score
-                    reward += self._compute_progress_any_reward()
-                elif self.reward_mode != "dense_guidance":
-                    # Standard intermediate reward for correct sequence
-                    if len(self.sequence) < len(self.target) and tile == self.target[len(self.sequence) - 1]:
-                        reward += self._compute_intermediate_reward(tile, len(self.sequence))
+                if self.reward_mode == "sparse":
+                    # No intermediate rewards for sparse mode
+                    pass
+                elif self.reward_mode == "dense_guidance":
+                    # Dense guidance handled separately above (distance-based)
+                    pass
+                else:
+                    # All other modes use longest suffix match pattern:
+                    # Reward based on change in sequence match score
+                    new_score = self._compute_longest_suffix_match()
+                    score_diff = new_score - self.prev_sequence_score
+                    
+                    if score_diff > 0:
+                        # Score increased - give positive reward based on mode
+                        reward += self._compute_intermediate_reward(tile, new_score) * score_diff
+                    elif score_diff < 0:
+                        # Score decreased - give negative reward (regression penalty)
+                        reward += score_diff  # Negative value
+                    
+                    self.prev_sequence_score = new_score
         
         if tuple(self.sequence) == self.target and not self.countdown:
             reward += 10.0
@@ -181,20 +197,6 @@ class PinPadEasy(embodied.Env):
                     return len(suffix)
         
         return 0
-
-    def _compute_progress_any_reward(self):
-        """
-        Compute reward based on change in longest suffix match score.
-        
-        Positive reward when score increases, negative when it decreases.
-        
-        Returns:
-            float: The reward (difference in scores)
-        """
-        new_score = self._compute_longest_suffix_match()
-        reward = float(new_score - self.prev_sequence_score)
-        self.prev_sequence_score = new_score
-        return reward
 
     def _compute_dense_guidance_reward(self, old_pos, new_pos, tile):
         """
@@ -282,6 +284,10 @@ class PinPadEasy(embodied.Env):
         elif self.reward_mode == "sparse":
             # No intermediate rewards - only completion bonus
             return 0.0
+        
+        elif self.reward_mode == "progress_any":
+            # progress_any uses flat +1.0 per matched position
+            return 1.0
         
         else:
             # Default to flat
