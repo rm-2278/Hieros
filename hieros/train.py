@@ -384,7 +384,114 @@ if __name__ == "__main__":
     for key, value in sorted(defaults.items(), key=lambda x: x[0]):
         arg_type = tools.args_type(value)
         parser.add_argument(f"--{key}", type=arg_type, default=arg_type(value))
-    args = parser.parse_args(remaining)
+    
+    # Parse known args first, then handle unknown args with dot notation
+    args, unknown = parser.parse_known_args(remaining)
+    
+    # Process unknown arguments that may contain dot notation (e.g., from wandb sweeps)
+    # These are arguments like --env.pinpad-easy.reward_mode=decaying
+    i = 0
+    while i < len(unknown):
+        arg = unknown[i]
+        if arg.startswith('--'):
+            # Handle both --key=value and --key value formats
+            if '=' in arg:
+                key_part, value = arg[2:].split('=', 1)
+                i += 1
+            else:
+                key_part = arg[2:]
+                if i + 1 < len(unknown) and not unknown[i + 1].startswith('--'):
+                    value = unknown[i + 1]
+                    i += 2
+                else:
+                    # Flag without value, treat as True
+                    value = 'True'
+                    i += 1
+            
+            # Convert hyphens to underscores (argparse standard)
+            key_part = key_part.replace('-', '_')
+            
+            # Handle dot notation: split and update nested structure
+            if '.' in key_part:
+                parts = key_part.split('.')
+                
+                # For the first part, check if it exists and is a dict
+                if hasattr(args, parts[0]):
+                    first_obj = getattr(args, parts[0])
+                    if isinstance(first_obj, dict):
+                        # Navigate through dict structure
+                        current = first_obj
+                        for part in parts[1:-1]:
+                            if part not in current:
+                                current[part] = {}
+                            current = current[part]
+                        
+                        # Set the final value
+                        final_key = parts[-1]
+                        try:
+                            # Try to parse as number
+                            if '.' in value:
+                                value = float(value)
+                            else:
+                                value = int(value)
+                        except ValueError:
+                            # Try to parse as boolean
+                            if value.lower() in ('true', 'false'):
+                                value = value.lower() == 'true'
+                            # Otherwise keep as string
+                        
+                        current[final_key] = value
+                    else:
+                        # Not a dict, treat as Namespace
+                        current = first_obj
+                        for part in parts[1:-1]:
+                            if not hasattr(current, part):
+                                setattr(current, part, argparse.Namespace())
+                            current = getattr(current, part)
+                        
+                        final_key = parts[-1]
+                        try:
+                            if '.' in value:
+                                value = float(value)
+                            else:
+                                value = int(value)
+                        except ValueError:
+                            if value.lower() in ('true', 'false'):
+                                value = value.lower() == 'true'
+                        
+                        setattr(current, final_key, value)
+                else:
+                    # First part doesn't exist, create Namespace structure
+                    current = args
+                    for part in parts[:-1]:
+                        if not hasattr(current, part):
+                            setattr(current, part, argparse.Namespace())
+                        current = getattr(current, part)
+                    
+                    final_key = parts[-1]
+                    try:
+                        if '.' in value:
+                            value = float(value)
+                        else:
+                            value = int(value)
+                    except ValueError:
+                        if value.lower() in ('true', 'false'):
+                            value = value.lower() == 'true'
+                    
+                    setattr(current, final_key, value)
+            else:
+                # Simple key without dots
+                try:
+                    if '.' in value:
+                        value = float(value)
+                    else:
+                        value = int(value)
+                except ValueError:
+                    if value.lower() in ('true', 'false'):
+                        value = value.lower() == 'true'
+                setattr(args, key_part, value)
+        else:
+            i += 1
 
     # Ensure that subactor_train_every matches subactor_update_every for now
     args.subactor_train_every = args.subactor_update_every
