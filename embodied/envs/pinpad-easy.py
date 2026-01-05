@@ -202,6 +202,9 @@ class PinPadEasy(embodied.Env):
         """
         Compute step-wise guidance reward based on movement toward target tile.
         
+        Uses suffix match score to determine the next target tile - the tile that
+        would extend the current longest suffix match.
+        
         Args:
             old_pos: Previous player position
             new_pos: Current player position  
@@ -210,8 +213,11 @@ class PinPadEasy(embodied.Env):
         Returns:
             float: Small positive/negative reward based on movement
         """
-        # Determine the next target tile in the sequence
-        next_target_idx = len(self.sequence)
+        # Use suffix match score to determine the next target tile
+        # This is the tile that would extend the current longest suffix match
+        current_score = self._compute_longest_suffix_match()
+        next_target_idx = current_score
+        
         if next_target_idx >= len(self.target):
             return 0.0  # Already completed
         
