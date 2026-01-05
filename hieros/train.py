@@ -384,7 +384,106 @@ if __name__ == "__main__":
     for key, value in sorted(defaults.items(), key=lambda x: x[0]):
         arg_type = tools.args_type(value)
         parser.add_argument(f"--{key}", type=arg_type, default=arg_type(value))
-    args = parser.parse_args(remaining)
+    
+    # Parse known args first, then handle unknown args with dot notation
+    args, unknown = parser.parse_known_args(remaining)
+    
+    # Helper function to infer value type from string
+    # Note: We don't use tools.args_type() here because that requires a default value
+    # to determine the target type. For unknown dot notation arguments from wandb,
+    # we don't have defaults, so we infer the type from the string itself.
+    def infer_value_type(value_str):
+        """Convert string to appropriate type (int, float, bool, or str)"""
+        # Try int first
+        try:
+            return int(value_str)
+        except ValueError:
+            pass
+        
+        # Try float
+        try:
+            return float(value_str)
+        except ValueError:
+            pass
+        
+        # Try boolean (common wandb parameter values)
+        if value_str.lower() in ('true', 'false', 'yes', 'no'):
+            return value_str.lower() in ('true', 'yes')
+        
+        # Return as string
+        return value_str
+    
+    # Helper function to set nested dict value
+    def set_nested_dict(d, parts, value):
+        """Navigate dict structure and set value at path specified by parts"""
+        current = d
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
+    
+    # Helper function to set nested namespace value
+    def set_nested_namespace(ns, parts, value):
+        """Navigate namespace structure and set value at path specified by parts"""
+        current = ns
+        for part in parts[:-1]:
+            if not hasattr(current, part):
+                setattr(current, part, argparse.Namespace())
+            current = getattr(current, part)
+        setattr(current, parts[-1], value)
+    
+    # Process unknown arguments that may contain dot notation (e.g., from wandb sweeps)
+    # These are arguments like --env.pinpad-easy.reward_mode=decaying
+    i = 0
+    while i < len(unknown):
+        arg = unknown[i]
+        if arg.startswith('--'):
+            # Handle both --key=value and --key value formats
+            if '=' in arg:
+                dotted_key, value = arg[2:].split('=', 1)
+                i += 1
+            else:
+                dotted_key = arg[2:]
+                if i + 1 < len(unknown) and not unknown[i + 1].startswith('--'):
+                    value = unknown[i + 1]
+                    i += 2
+                else:
+                    # Flag without value, treat as True
+                    value = 'True'
+                    i += 1
+            
+            # Skip if key is empty (malformed argument like --=value)
+            if not dotted_key:
+                continue
+            
+            # Convert hyphens to underscores (argparse standard)
+            dotted_key = dotted_key.replace('-', '_')
+            
+            # Infer the type of the value
+            typed_value = infer_value_type(value)
+            
+            # Handle dot notation: split and update nested structure
+            if '.' in dotted_key:
+                parts = dotted_key.split('.')
+                
+                # For the first part, check if it exists and is a dict
+                if hasattr(args, parts[0]):
+                    first_obj = getattr(args, parts[0])
+                    if isinstance(first_obj, dict):
+                        # Navigate through dict structure
+                        set_nested_dict(first_obj, parts[1:], typed_value)
+                    else:
+                        # Not a dict, treat as Namespace
+                        set_nested_namespace(first_obj, parts[1:], typed_value)
+                else:
+                    # First part doesn't exist, create Namespace structure
+                    set_nested_namespace(args, parts, typed_value)
+            else:
+                # Simple key without dots
+                setattr(args, dotted_key, typed_value)
+        else:
+            i += 1
 
     # Ensure that subactor_train_every matches subactor_update_every for now
     args.subactor_train_every = args.subactor_update_every
