@@ -25,7 +25,7 @@ class PinPadEasy(embodied.Env):
         "sparse": "Only reward for completing full sequence",
         "progressive_steep": "Steeper exponential increase for later tiles",
         "dense_guidance": "Step-wise rewards: +0.1 for moving toward target, -0.1 for wrong tile",
-        "progress_any": "Reward any tile that contributes to sequence progress",
+        "progress_any": "Reward based on longest suffix match to target sequence",
     }
 
     # Dense guidance reward constants (can be tuned)
@@ -70,8 +70,8 @@ class PinPadEasy(embodied.Env):
         self.reward_mode = reward_mode
         print(f'Created PinPadEasy env with sequence: {"->".join(self.target)}, reward_mode: {reward_mode}')
         self.sequence = collections.deque(maxlen=len(self.target))
-        # Track correctly visited tiles for progress_any mode
-        self.visited_correct_tiles = set()
+        # Track previous sequence score for progress_any mode
+        self.prev_sequence_score = 0
         self.player = None
         self.steps = None
         self.done = None
@@ -105,7 +105,7 @@ class PinPadEasy(embodied.Env):
         if self.done or action["reset"]:
             self.player = self.spawns[self.random.randint(len(self.spawns))]
             self.sequence.clear()
-            self.visited_correct_tiles = set()
+            self.prev_sequence_score = 0
             self.steps = 0
             self.done = False
             self.countdown = 0
@@ -117,7 +117,7 @@ class PinPadEasy(embodied.Env):
             if self.countdown == 0:
                 self.player = self.spawns[self.random.randint(len(self.spawns))]
                 self.sequence.clear()
-                self.visited_correct_tiles = set()
+                self.prev_sequence_score = 0
         
         reward = 0.0
         old_pos = self.player
@@ -141,14 +141,8 @@ class PinPadEasy(embodied.Env):
                 
                 # Handle different reward modes for tile visits
                 if self.reward_mode == "progress_any":
-                    # Give reward for any tile that's part of the target sequence
-                    # and hasn't been rewarded yet in this episode
-                    if tile in self.target and tile not in self.visited_correct_tiles:
-                        # Calculate reward based on count before adding tile
-                        tiles_before = len(self.visited_correct_tiles)
-                        self.visited_correct_tiles.add(tile)
-                        # Give reward based on how many tiles collected so far (1.0, 1.5, 2.0, ...)
-                        reward += 1.0 + 0.5 * tiles_before
+                    # Compute reward based on change in longest suffix match score
+                    reward += self._compute_progress_any_reward()
                 elif self.reward_mode != "dense_guidance":
                     # Standard intermediate reward for correct sequence
                     if len(self.sequence) < len(self.target) and tile == self.target[len(self.sequence) - 1]:
@@ -160,6 +154,47 @@ class PinPadEasy(embodied.Env):
         self.steps += 1
         self.done = self.done or (self.steps >= self.length)
         return self._obs(reward=reward, is_last=self.done)
+
+    def _compute_longest_suffix_match(self):
+        """
+        Compute the longest suffix of the buffer that matches a prefix of the target sequence.
+        
+        For example, if target is (1, 2, 3) and buffer is [2, 1], the longest suffix match is 1
+        (just "1" matches the start of target). If buffer is [1, 2], match is 2.
+        If buffer is [3, 1], match is 1. If buffer is [2, 3], match is 0.
+        
+        Returns:
+            int: Length of longest suffix of buffer matching prefix of target
+        """
+        if not self.sequence:
+            return 0
+        
+        buffer_list = list(self.sequence)
+        target_list = list(self.target)
+        
+        # Try each suffix of the buffer (from longest to shortest)
+        for suffix_start in range(len(buffer_list)):
+            suffix = buffer_list[suffix_start:]
+            # Check if this suffix matches the beginning of target
+            if len(suffix) <= len(target_list):
+                if suffix == target_list[:len(suffix)]:
+                    return len(suffix)
+        
+        return 0
+
+    def _compute_progress_any_reward(self):
+        """
+        Compute reward based on change in longest suffix match score.
+        
+        Positive reward when score increases, negative when it decreases.
+        
+        Returns:
+            float: The reward (difference in scores)
+        """
+        new_score = self._compute_longest_suffix_match()
+        reward = float(new_score - self.prev_sequence_score)
+        self.prev_sequence_score = new_score
+        return reward
 
     def _compute_dense_guidance_reward(self, old_pos, new_pos, tile):
         """
