@@ -84,7 +84,7 @@ defaults:
   
   add_hierarchy_every: 1
   use_subgoal: true
-  max_hierarchy: 3
+  max_hierarchy: 2
   subgoal_visualization: True
   subgoal_debug_visualization: True
   subactor_update_every: 4
@@ -164,7 +164,7 @@ defaults:
     dmc: {size: [64, 64], repeat: 2, camera: -1}
     loconav: {size: [64, 64], repeat: 2, camera: -1}
     pinpad: {}
-    pinpad-easy: {}
+    pinpad-easy: {reward_mode: flat}
 
   # Model
   dynamics_model: "s5"
@@ -389,13 +389,13 @@ pinpad-easy-director:
   # debug: True
 
 pinpad-easy-entropy:
-  steps: 1200000
+  steps: 500000
   envs:
     amount: 8
   action_repeat: 1
   actor_dist: 'onehot'
   imag_gradient: 'reinforce'
-  eval_every: 200000
+  eval_every: 100000
   eval_eps: 10
   log_every: 5000
   batch_size: 16

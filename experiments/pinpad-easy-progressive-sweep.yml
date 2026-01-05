@@ -3,13 +3,13 @@ command:
   - ${interpreter}
   - ${program}
   - --configs
-  - pinpad-easy-entropy
+  - pinpad-easy-director
   - s5_no_mlp
   - s5_silu_act
   - rm_model_size
   - additional_inputs
   - --max_hierarchy
-  - "3"
+  - "2"
   - --subgoal_visualization
   - "True"
   - --wandb_logging
@@ -34,17 +34,21 @@ method: grid
 metric:
   goal: maximize
   name: episode/score
-name: pinpad-easy3_sweep
+name: pinpad-easy-progressive-sweep
 parameters:
   seed:
-    values: [42]
+    values: [42, 41020, 718920]
   task:
     values: [
       "pinpad-easy_three"
     ]
+  env.pinpad-easy.reward_mode:
+    values: ["progressive", "progressive_steep"]
   subactor_update_every:
-    values: [8]
+    values: [4, 8, 12, 16]
+  train_ratio:
+    values: [8, 16, 32, 64]
   actor_entropy:
-    values: ["['3e-3', '1e-2', '3e-2']", "['3e-2', '1e-1', '3e-1']", "['3e-3', '1e-3', '3e-4']", "3e-2", "3e-1", "['3e-4', '1e-3', '3e-2']"]
+    values: ['3e-3', '1e-3', '3e-4']
   
 program: hieros/train.py
