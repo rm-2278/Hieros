@@ -41,7 +41,7 @@ defaults:
   novelty_only_higher_level: false
   add_hierarchy_every: 1
   use_subgoal: true
-  max_hierarchy: 3
+  max_hierarchy: 2
   subgoal_visualization: True
   subgoal_debug_visualization: True
   subactor_update_every: 4
@@ -121,7 +121,7 @@ defaults:
     dmc: {size: [64, 64], repeat: 2, camera: -1}
     loconav: {size: [64, 64], repeat: 2, camera: -1}
     pinpad: {}
-    pinpad-easy: {}
+    pinpad-easy: {reward_mode: flat}
 
   # Model
   dynamics_model: "s5"
