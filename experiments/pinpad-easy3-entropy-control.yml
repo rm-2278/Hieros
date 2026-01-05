@@ -40,12 +40,11 @@ parameters:
     values: [42]
   task:
     values: [
-      "pinpad-easy_three",
-      "pinpad-easy_four"
+      "pinpad-easy_three"
     ]
   subactor_update_every:
     values: [8]
   actor_entropy:
-    values: ["['3e-4', '1e-3', '3e-3']", "['3e-3', '1e-3', '3e-4']", "3e-4", "3e-3", "['3e-4', '1e-3', '3e-2']"]
+    values: ["['3e-3', '1e-2', '3e-2']", "['3e-2', '1e-1', '3e-1']", "['3e-3', '1e-3', '3e-4']", "3e-2", "3e-1", "['3e-4', '1e-3', '3e-2']"]
   
 program: hieros/train.py
