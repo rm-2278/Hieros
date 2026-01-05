@@ -16,8 +16,19 @@ class PinPadEasy(embodied.Env):
         "8": (0, 128, 128),
     }
 
-    def __init__(self, task, length=1000, seed=None):
+    # Reward modes for experimentation
+    REWARD_MODES = {
+        "flat": "Flat +1.0 for each correct intermediate tile (original)",
+        "progressive": "Exponentially increasing rewards for later tiles",
+        "sequence_bonus": "Base reward + bonus based on sequence length",
+        "decaying": "Time-decaying intermediate rewards",
+        "sparse": "Only reward for completing full sequence",
+        "progressive_steep": "Steeper exponential increase for later tiles",
+    }
+
+    def __init__(self, task, length=1000, seed=None, reward_mode="flat"):
         assert length > 0
+        assert reward_mode in self.REWARD_MODES, f"Invalid reward_mode: {reward_mode}. Valid modes: {list(self.REWARD_MODES.keys())}"
         layout = {
             "three": LAYOUT_THREE,
             "four": LAYOUT_FOUR,
@@ -37,12 +48,15 @@ class PinPadEasy(embodied.Env):
         for (x, y), char in np.ndenumerate(self.layout):
             if char != "#":
                 self.spawns.append((x, y))
-        print(f'Created PinPadEasy env with sequence: {"->".join(self.target)}')
+        self.reward_mode = reward_mode
+        print(f'Created PinPadEasy env with sequence: {"->".join(self.target)}, reward_mode: {reward_mode}')
         self.sequence = collections.deque(maxlen=len(self.target))
         self.player = None
         self.steps = None
         self.done = None
         self.countdown = None
+        # Track tile visits for decaying reward mode
+        self.tile_visits = {tile: 0 for tile in self.pads}
         # Position visit tracking for visualization
         self.position_visit_counts = np.zeros((16, 14), dtype=np.int64)
         # Cache spaces with seed
@@ -73,6 +87,8 @@ class PinPadEasy(embodied.Env):
             self.steps = 0
             self.done = False
             self.countdown = 0
+            # Reset tile visits for decaying mode
+            self.tile_visits = {tile: 0 for tile in self.pads}
             return self._obs(reward=0.0, is_first=True)
         if self.countdown:
             self.countdown -= 1
@@ -91,15 +107,62 @@ class PinPadEasy(embodied.Env):
         if tile in self.pads:
             if not self.sequence or self.sequence[-1] != tile:
                 self.sequence.append(tile)
-                # Intermediate reward for reaching the next correct pad
+                # Intermediate reward based on reward_mode
                 if len(self.sequence) < len(self.target) and tile == self.target[len(self.sequence) - 1]:
-                    reward += 1.0
+                    reward += self._compute_intermediate_reward(tile, len(self.sequence))
         if tuple(self.sequence) == self.target and not self.countdown:
             reward += 10.0
             self.countdown = 10
         self.steps += 1
         self.done = self.done or (self.steps >= self.length)
         return self._obs(reward=reward, is_last=self.done)
+
+    def _compute_intermediate_reward(self, tile, sequence_position):
+        """
+        Compute intermediate reward based on the reward mode.
+        
+        Args:
+            tile: The tile character that was just reached
+            sequence_position: The current position in the sequence (1-indexed)
+        
+        Returns:
+            float: The intermediate reward for reaching this tile
+        """
+        if self.reward_mode == "flat":
+            # Original: flat +1.0 for each correct intermediate tile
+            return 1.0
+        
+        elif self.reward_mode == "progressive":
+            # Exponentially increasing rewards: 1.0, 2.0, 4.0, 8.0, ...
+            # This makes later tiles much more valuable to incentivize progression
+            return 2.0 ** (sequence_position - 1)
+        
+        elif self.reward_mode == "progressive_steep":
+            # Steeper exponential: 1.0, 3.0, 9.0, 27.0, ...
+            # Even stronger incentive to reach later tiles
+            return 3.0 ** (sequence_position - 1)
+        
+        elif self.reward_mode == "sequence_bonus":
+            # Base reward + multiplicative bonus based on sequence length
+            # e.g., 1.0 + 0.5*1 = 1.5, 1.0 + 0.5*2 = 2.0, 1.0 + 0.5*3 = 2.5
+            base_reward = 1.0
+            sequence_bonus = 0.5 * sequence_position
+            return base_reward + sequence_bonus
+        
+        elif self.reward_mode == "decaying":
+            # Time-decaying intermediate rewards based on tile visits
+            # First visit: full reward, subsequent visits: decayed reward
+            decay_factor = 1.0 / (1.0 + 0.1 * self.tile_visits[tile])
+            self.tile_visits[tile] += 1
+            return 1.0 * decay_factor
+        
+        elif self.reward_mode == "sparse":
+            # No intermediate rewards - only completion bonus
+            return 0.0
+        
+        else:
+            # Default to flat
+            return 1.0
 
     def render(self):
         grid = np.zeros((16, 16, 3), np.uint8) + 255

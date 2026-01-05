@@ -121,7 +121,7 @@ defaults:
     dmc: {size: [64, 64], repeat: 2, camera: -1}
     loconav: {size: [64, 64], repeat: 2, camera: -1}
     pinpad: {}
-    pinpad-easy: {}
+    pinpad-easy: {reward_mode: flat}
 
   # Model
   dynamics_model: "s5"
